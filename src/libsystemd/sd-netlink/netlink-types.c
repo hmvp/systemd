@@ -287,6 +287,12 @@ static const NLType rtnl_link_info_data_vrf_types[] = {
         [IFLA_VRF_TABLE]                 = { .type = NETLINK_TYPE_U32 },
 };
 
+
+static const NLType rtnl_link_info_data_can_types[] = {
+        /* [IFLA_CAN_BITTIMING]            = { .type = NETLINK_TYPE_U32 }, */
+        [IFLA_CAN_RESTART_MS]           = { .type = NETLINK_TYPE_U32 },
+};
+
 static const NLType rtnl_link_info_data_geneve_types[] = {
         [IFLA_GENEVE_ID]                = { .type = NETLINK_TYPE_U32 },
         [IFLA_GENEVE_TTL]               = { .type = NETLINK_TYPE_U8 },
@@ -322,6 +328,7 @@ static const char* const nl_union_link_info_data_table[] = {
         [NL_UNION_LINK_INFO_DATA_IP6TNL_TUNNEL] = "ip6tnl",
         [NL_UNION_LINK_INFO_DATA_VRF] = "vrf",
         [NL_UNION_LINK_INFO_DATA_VCAN] = "vcan",
+        [NL_UNION_LINK_INFO_DATA_CAN] = "can",
         [NL_UNION_LINK_INFO_DATA_GENEVE] = "geneve",
 };
 
@@ -364,6 +371,8 @@ static const NLTypeSystem rtnl_link_info_data_type_systems[] = {
                                                        .types = rtnl_link_info_data_ip6tnl_types },
         [NL_UNION_LINK_INFO_DATA_VRF] =              { .count = ELEMENTSOF(rtnl_link_info_data_vrf_types),
                                                        .types = rtnl_link_info_data_vrf_types },
+        [NL_UNION_LINK_INFO_DATA_CAN] =              { .count = ELEMENTSOF(rtnl_link_info_data_can_types),
+                                                       .types = rtnl_link_info_data_can_types },
         [NL_UNION_LINK_INFO_DATA_GENEVE] =           { .count = ELEMENTSOF(rtnl_link_info_data_geneve_types),
                                                        .types = rtnl_link_info_data_geneve_types },
 };

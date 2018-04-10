@@ -19,6 +19,7 @@
 
 #include <netinet/ether.h>
 #include <linux/if.h>
+#include <linux/can/netlink.h>
 #include <unistd.h>
 
 #include "alloc-util.h"
@@ -1238,6 +1239,25 @@ static int link_set_handler(sd_netlink *rtnl, sd_netlink_message *m, void *userd
         return 0;
 }
 
+static int link_can_set_handler(sd_netlink *rtnl, sd_netlink_message *m, void *userdata) {
+        _cleanup_link_unref_ Link *link = userdata;
+        int r;
+
+        log_link_debug(link, "Can Set link");
+
+        r = sd_netlink_message_get_errno(m);
+        if (r < 0 && r != -EEXIST) {
+                log_link_error_errno(link, r, "Could not set netlink properties CAN : %m");
+                link_enter_failed(link);
+                return 1;
+        }
+
+
+        log_link_debug(link, "Success Can Set link");
+
+        return 0;
+}
+
 static int set_mtu_handler(sd_netlink *rtnl, sd_netlink_message *m, void *userdata) {
         _cleanup_link_unref_ Link *link = userdata;
         int r;
@@ -1822,6 +1842,68 @@ int link_down(Link *link) {
         link_ref(link);
 
         return 0;
+}
+
+static int link_set_can(Link *link) {
+        _cleanup_(sd_netlink_message_unrefp) sd_netlink_message *m = NULL;
+         int r;
+
+        assert(link);
+        assert(link->network);
+        assert(link->manager);                                                                                                                                                                  assert(link->manager->rtnl);
+
+        log_link_debug(link, "link_set_can");
+
+        r = sd_rtnl_message_new_link(link->manager->rtnl, &m, RTM_NEWLINK, 0);
+        if (r < 0)
+                return log_error_errno(r, "Failed to allocate netlink message: %m");
+
+        r = sd_netlink_message_open_container(m, IFLA_LINKINFO);
+        if (r < 0)
+                return log_error_errno(r, "Failed to open netlink container: %m");
+
+        r = sd_netlink_message_open_container_union(m, IFLA_INFO_DATA, "can");
+        if (r < 0)
+                return log_error_errno(r, "Failed to open netlink container: %m");
+
+        if (link->network->bitrate > 0 || link->network->sample_point > 0) {
+                struct can_bittiming bt = {};
+
+                bt.bitrate = link->network->bitrate;
+                bt.sample_point = link->network->sample_point;
+
+                log_link_debug(link, "Setting bitrate = %d", bt.bitrate);
+                log_link_debug(link, "Setting sample point = %d", bt.sample_point);
+                
+                r = sd_netlink_message_append_data(m, IFLA_CAN_BITTIMING, &bt, sizeof(bt));
+                if (r < 0)
+                        return log_link_error_errno(link, r, "Could not append IFLA_CAN_BITTIMING attribute: %m");
+        }
+        
+        if (link->network->restart_ms > 0) {
+                log_link_debug(link, "Setting restart ms = %d", link->network->restart_ms);
+
+                r = sd_netlink_message_append_u32(m, IFLA_CAN_RESTART_MS, link->network->restart_ms);
+                if (r < 0)
+                        return log_link_error_errno(link, r, "Could not append IFLA_CAN_RESTART_MS attribute: %m");
+        }
+
+        r = sd_netlink_message_close_container(m);
+        if (r < 0)
+                return log_link_error_errno(link, r, "Failed to close netlink container: %m");
+
+        r = sd_netlink_message_close_container(m);
+        if (r < 0)
+                return log_link_error_errno(link, r, "Failed to close netlink container: %m");
+
+        r = sd_netlink_call_async(link->manager->rtnl, m, link_can_set_handler, link,  0, NULL);
+        if (r < 0)
+                return log_link_error_errno(link, r, "Could not send rtnetlink message: %m");
+
+
+        log_link_debug(link, "link_set_can done");
+
+        return r;
 }
 
 static int link_up_can(Link *link) {
@@ -2516,7 +2598,15 @@ static int link_configure(Link *link) {
         assert(link->network);
         assert(link->state == LINK_STATE_PENDING);
 
-        if (streq_ptr(link->kind, "vcan")) {
+        if (streq_ptr(link->kind, "vcan") || streq_ptr(link->kind, "can")) {
+
+                if (streq_ptr(link->kind, "can")) {
+                        r = link_set_can(link);
+                        if (r < 0) {
+                                log_link_warning_errno(link, r, "Could not set CAN properties: %m");
+                                return r;
+                        }
+                }
 
                 if (!(link->flags & IFF_UP)) {
                         r = link_up_can(link);

@@ -178,6 +178,11 @@ struct Network {
         uint16_t pvid;
         uint32_t br_vid_bitmap[BRIDGE_VLAN_BITMAP_LEN];
         uint32_t br_untagged_bitmap[BRIDGE_VLAN_BITMAP_LEN];
+        
+        /* CAN support */
+        uint32_t bitrate;
+        uint32_t sample_point;
+        uint32_t restart_ms;
 
         AddressFamilyBoolean ip_forward;
         bool ip_masquerade;
